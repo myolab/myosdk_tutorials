@@ -1,11 +1,12 @@
 """
-MyoSDK Retargeting App with Joint Dropdown Visualization (fixed multi-joint plot)
+MyoSDK Retargeting App
 """
 
 import os
 import tempfile
 
 import gradio as gr
+import myosdk
 import numpy as np
 import pandas as pd
 import plotly.graph_objs as go
@@ -19,108 +20,115 @@ def run_retargeting(api_key, c3d_files, markerset_file):
     status = []
     output_files = []
 
+    # Initial validation
     if not api_key:
         api_key = os.getenv("MYOSDK_API_KEY")
         if not api_key:
-            return (
+            yield (
                 "❌ Error: API key missing",
                 None,
                 None,
-                gr.update(choices=[], value=[]),
-                None,
+                gr.update(value=[], visible=True),
+                gr.update(visible=False),
             )
+
+    if markerset_file is None:
+        yield (
+            "❌ Error: Markerset XML file is required",
+            None,
+            None,
+            gr.update(value=[], visible=True),
+            gr.update(visible=False),
+        )
 
     try:
+        # Initialize client
+        status.append("🔹 Initializing MyoSDK client...")
+        yield "\n".join(status), None, None, gr.update(visible=False), gr.update(
+            visible=False
+        )
         client = Client(api_key=api_key, base_url="https://v2m-alb-us-east-1.myolab.ai")
-        status.append("🔹 MyoSDK client initialized")
 
-        if markerset_file is None:
-            return (
-                "❌ Error: Markerset XML file is required",
-                None,
-                None,
-                gr.update(choices=[], value=[]),
-                None,
-            )
-
+        # Upload markerset
+        status.append("🔹 Uploading markerset file...")
+        yield "\n".join(status), None, None, gr.update(value=[]), gr.update(
+            visible=False
+        )
         mk_asset = client.assets.upload_file(markerset_file.name)
         mk_id = mk_asset["asset_id"]
 
-        for f in c3d_files:
-            status.append(f"➡ Processing file {os.path.basename(f)}")
-            print("\n".join(status))
+        # Process each C3D file
+        total_files = len(c3d_files)
+        for idx, f in enumerate(c3d_files):
+            status.append(
+                f"➡ Processing file {idx + 1}/{total_files}: {os.path.basename(f)}"
+            )
+            progress_value = 0.05 + 0.8 * (idx / total_files)
+            yield "\n".join(status), None, None, gr.update(value=[]), gr.update(
+                visible=False
+            ), progress_value
+
             c3d_asset = client.assets.upload_file(f)
             job = client.jobs.start_retarget(
                 c3d_asset_id=c3d_asset["asset_id"],
                 markerset_asset_id=mk_id,
             )
             result = client.jobs.wait(job["job_id"])
-            print(f"✅ Retargeting job completed. Status: {result['status']}")
+
             if result["status"] != "SUCCEEDED":
-                status.append("❌ Failed retarget")
+                status.append(f"❌ Failed retarget for {os.path.basename(f)}")
                 continue
 
+            status.append(f"✅ Retargeting completed for {os.path.basename(f)}")
             base = os.path.splitext(os.path.basename(f))[0]
             out_path = os.path.join(tempfile.gettempdir(), base + ".npy")
             client.assets.download(result["output"]["qpos_asset_id"], out_path)
             output_files.append(out_path)
 
         if not output_files:
-            return (
-                "\n".join(status),
-                None,
-                None,
-                gr.update(choices=[], value=[]),
-                None,
-            )
+            yield "\n".join(status), None, None, gr.update(value=[]), gr.update(
+                visible=False
+            ), 1.0
 
-        # Load angles
-        data = np.load(output_files[0]).squeeze()
-        if data.ndim == 1:
-            data = data.reshape(-1, 1)
+        # Load angles from first output file
+        status.append("🔹 Loading angle data...")
+        yield "\n".join(status), None, None, gr.update(visible=True), gr.update(
+            visible=True
+        )
 
-        num_cols = data.shape[1]
-        df = pd.DataFrame(data, columns=[f"angle{i}" for i in range(num_cols)])
+        data = np.load(output_files[0])
+        joints_qpos = data["joints_qpos"].squeeze()
+        joint_names = data["joints_qpos_colnames"]
+
+        df = pd.DataFrame(joints_qpos, columns=[jn for jn in joint_names])
         df.insert(0, "frame", df.index)
 
-        angle_list = list(df.columns[1:])  # no "frame"
-        first_angle = angle_list[0] if angle_list else None
+        angle_list = list(df.columns[1:])
+        initial_value = [angle_list[0]] if angle_list else []
 
-        # Keep initial plot as None, will be populated by dropdown change
-        initial_plot = None
-
-        # For multiselect, value should be a list
-        initial_value = [first_angle] if first_angle else []
-
-        return (
+        status.append("✅ Complete!")
+        yield (
             "\n".join(status),
             output_files[0],
             df,
-            gr.update(choices=angle_list, value=initial_value),
-            initial_plot,
+            gr.update(choices=angle_list, value=initial_value, visible=True),
+            gr.update(visible=True),
         )
 
     except Exception as e:
-        print("error:", e)
-        return f"❌ {e}", None, None, gr.update(choices=[], value=[]), None
+        yield (
+            f"❌ {e}",
+            None,
+            None,
+            gr.update(visible=False),
+            gr.update(visible=False),
+            1.0,
+        )
 
 
-# Connect retargeting
-def retarget_wrapper(api_key, c3d_files, markerset):
-    status, file, df, dropdown_update, _ = run_retargeting(
-        api_key, c3d_files, markerset
-    )
-
-    if df is not None and not df.empty:
-        initial_joints = list(dropdown_update["value"])
-        initial_plot = update_plot(df, initial_joints)
-    else:
-        initial_plot = None
-
-    return status, file, df, dropdown_update, initial_plot
-
-
-# Update plot when choosing angle
+# ------------------------------------------------------------
+# Plotting
+# ------------------------------------------------------------
 def update_plot(df, joints):
     if df is None or df.empty:
         return go.Figure()
@@ -138,18 +146,11 @@ def update_plot(df, joints):
         title="Joint Angles",
         xaxis_title="Frame",
         yaxis_title="Angle Value",
-        plot_bgcolor="#1E1E1E",  # Matches Gradio dark panel
-        paper_bgcolor="#1E1E1E",  # Overall figure background
-        font=dict(color="#F0F0F0", family="Arial"),  # Text color
-        xaxis=dict(
-            title="Frame",
-            gridcolor="#444444",  # Slightly lighter than background
-            linecolor="#F0F0F0",
-            tickcolor="#F0F0F0",
-        ),
-        yaxis=dict(
-            title="Value", gridcolor="#444444", linecolor="#F0F0F0", tickcolor="#F0F0F0"
-        ),
+        plot_bgcolor="#1E1E1E",
+        paper_bgcolor="#1E1E1E",
+        font=dict(color="#F0F0F0", family="Arial"),
+        xaxis=dict(gridcolor="#444444", linecolor="#F0F0F0", tickcolor="#F0F0F0"),
+        yaxis=dict(gridcolor="#444444", linecolor="#F0F0F0", tickcolor="#F0F0F0"),
         legend=dict(font=dict(color="#F0F0F0")),
     )
     return fig
@@ -160,12 +161,12 @@ def update_plot(df, joints):
 # ------------------------------------------------------------
 with gr.Blocks() as app:
     with gr.Row():
-        with gr.Column(scale=3):  # 75% width
+        with gr.Column(scale=3):
             gr.Markdown(
                 """
-    ## MyoSDK Retargeting with Joint Visualization
-    You need an API key to use this app. Get it on [dev.myolab.ai](dev.myolab.ai). Follow the instructions [here](https://docs.myolab.ai/docs/myosdk/getting-started/api-key)
-    """
+                ## MyoSDK Retargeting with Joint Visualization
+                Get your API key at https://dev.myolab.ai
+                """
             )
         with gr.Column(scale=1):
             api_key = gr.Textbox(label="API Key", type="password")
@@ -177,33 +178,23 @@ with gr.Blocks() as app:
 
     run_btn = gr.Button("Run Retargeting")
 
-    output_file = gr.File(label="Download")
-
+    status_box = gr.Textbox(label="Status", lines=12)
+    output_file = gr.File(label="Download", visible=False)
     df_state = gr.State()
-
     joint_dropdown = gr.Dropdown(
         label="Select Joint Angle(s)",
-        choices=[],
-        value=[],
         interactive=True,
         multiselect=True,
+        visible=True,
     )
+    plot_area = gr.Plot(label="Angle Plot", visible=False)
 
-    # LinePlot configured for multi-series plotting
-    plot_area = gr.Plot(label="Angle Plot")
-
-    status_box = gr.Textbox(label="Status", lines=10)
+    gr.Markdown(f"MyoSDK version {myosdk.__version__}")
 
     run_btn.click(
-        fn=retarget_wrapper,
+        fn=run_retargeting,
         inputs=[api_key, c3d_files, markerset],
-        outputs=[
-            status_box,
-            output_file,
-            df_state,
-            joint_dropdown,
-            plot_area,
-        ],
+        outputs=[status_box, output_file, df_state, joint_dropdown, plot_area],
     )
 
     joint_dropdown.change(
@@ -212,6 +203,9 @@ with gr.Blocks() as app:
         outputs=[plot_area],
     )
 
-
 if __name__ == "__main__":
-    app.launch(share=True, server_name="0.0.0.0", server_port=7860)
+    app.launch(
+        share=True,
+        server_name="0.0.0.0",
+        server_port=7860,
+    )
