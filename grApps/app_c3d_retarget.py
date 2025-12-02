@@ -63,10 +63,10 @@ def run_retargeting(api_key, c3d_files, markerset_file):
             status.append(
                 f"➡ Processing file {idx + 1}/{total_files}: {os.path.basename(f)}"
             )
-            progress_value = 0.05 + 0.8 * (idx / total_files)
+
             yield "\n".join(status), None, None, gr.update(value=[]), gr.update(
                 visible=False
-            ), progress_value
+            )
 
             c3d_asset = client.assets.upload_file(f)
             job = client.jobs.start_retarget(
@@ -88,7 +88,7 @@ def run_retargeting(api_key, c3d_files, markerset_file):
         if not output_files:
             yield "\n".join(status), None, None, gr.update(value=[]), gr.update(
                 visible=False
-            ), 1.0
+            )
 
         # Load angles from first output file
         status.append("🔹 Loading angle data...")
