@@ -50,7 +50,7 @@ Navigate to the `grApps` directory and install dependencies:
 
 ```bash
 cd grApps
-uv pip install gradio myosdk
+uv pip install -r requirements.txt
 ```
 
 Or if you prefer to use a virtual environment:

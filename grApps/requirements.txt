@@ -1,0 +1,3 @@
+gradio>6
+plotly
+myosdk
