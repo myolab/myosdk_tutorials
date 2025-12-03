@@ -4,6 +4,7 @@ MyoSDK Retargeting App
 
 import os
 import tempfile
+import time
 
 import gradio as gr
 import myosdk
@@ -44,17 +45,30 @@ def run_retargeting(api_key, c3d_files, markerset_file):
     try:
         # Initialize client
         status.append("🔹 Initializing MyoSDK client...")
+        init_time = time.time()
         yield "\n".join(status), None, None, gr.update(visible=False), gr.update(
             visible=False
         )
         client = Client(api_key=api_key, base_url="https://v2m-alb-us-east-1.myolab.ai")
 
+        status.append(
+            f"🔹 MyoSDK client initialized in { time.time() - init_time:.2f} seconds"
+        )
+        init_time = time.time()
         # Upload markerset
         status.append("🔹 Uploading markerset file...")
         yield "\n".join(status), None, None, gr.update(value=[]), gr.update(
             visible=False
         )
         mk_asset = client.assets.upload_file(markerset_file.name)
+
+        status.append(
+            f"🔹 Markerset file uploaded in {time.time() - init_time:.2f} seconds"
+        )
+        yield "\n".join(status), None, None, gr.update(value=[]), gr.update(
+            visible=False
+        )
+        init_time = time.time()
         mk_id = mk_asset["asset_id"]
 
         # Process each C3D file
@@ -69,17 +83,38 @@ def run_retargeting(api_key, c3d_files, markerset_file):
             )
 
             c3d_asset = client.assets.upload_file(f)
+            status.append(
+                f"\t🔹 C3D file uploaded in {time.time() - init_time:.2f} seconds"
+            )
+            yield "\n".join(status), None, None, gr.update(value=[]), gr.update(
+                visible=False
+            )
+            init_time = time.time()
             job = client.jobs.start_retarget(
                 c3d_asset_id=c3d_asset["asset_id"],
                 markerset_asset_id=mk_id,
             )
+
+            status.append(
+                f"\t🔹 Retargeting job started in {time.time() - init_time:.2f} seconds"
+            )
+            yield "\n".join(status), None, None, gr.update(value=[]), gr.update(
+                visible=False
+            )
+            init_time = time.time()
             result = client.jobs.wait(job["job_id"])
 
+            status.append(
+                f"\t🔹 Retargeting job completed in {time.time() - init_time:.2f} seconds"
+            )
+            yield "\n".join(status), None, None, gr.update(value=[]), gr.update(
+                visible=False
+            )
             if result["status"] != "SUCCEEDED":
-                status.append(f"❌ Failed retarget for {os.path.basename(f)}")
+                status.append(f"\t❌ Failed retarget for {os.path.basename(f)}")
                 continue
 
-            status.append(f"✅ Retargeting completed for {os.path.basename(f)}")
+            status.append(f"\t✅ Retargeting completed for {os.path.basename(f)}")
             base = os.path.splitext(os.path.basename(f))[0]
             out_path = os.path.join(tempfile.gettempdir(), base + ".npy")
             client.assets.download(result["output"]["qpos_asset_id"], out_path)
@@ -92,9 +127,9 @@ def run_retargeting(api_key, c3d_files, markerset_file):
 
         # Load angles from first output file
         status.append("🔹 Loading angle data...")
-        yield "\n".join(status), None, None, gr.update(visible=True), gr.update(
-            visible=True
-        )
+        yield "\n".join(status), None, None, gr.update(
+            interactive=True, visible=True
+        ), gr.update(visible=True)
 
         data = np.load(output_files[0])
         joints_qpos = data["joints_qpos"].squeeze()
@@ -122,7 +157,6 @@ def run_retargeting(api_key, c3d_files, markerset_file):
             None,
             gr.update(visible=False),
             gr.update(visible=False),
-            1.0,
         )
 
 
@@ -178,16 +212,16 @@ with gr.Blocks() as app:
 
     run_btn = gr.Button("Run Retargeting")
 
-    status_box = gr.Textbox(label="Status", lines=12)
     output_file = gr.File(label="Download", visible=False)
     df_state = gr.State()
     joint_dropdown = gr.Dropdown(
         label="Select Joint Angle(s)",
-        interactive=True,
+        interactive=False,
         multiselect=True,
         visible=True,
     )
     plot_area = gr.Plot(label="Angle Plot", visible=False)
+    status_box = gr.Textbox(label="Status", lines=12)
 
     gr.Markdown(f"MyoSDK version {myosdk.__version__}")
 
