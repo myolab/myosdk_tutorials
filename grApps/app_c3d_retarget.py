@@ -68,7 +68,7 @@ def run_retargeting(api_key, c3d_files, markerset_file):
         yield "\n".join(status), None, None, gr.update(value=[]), gr.update(
             visible=False
         )
-        init_time = time.time()
+
         mk_id = mk_asset["asset_id"]
 
         # Process each C3D file
@@ -81,7 +81,7 @@ def run_retargeting(api_key, c3d_files, markerset_file):
             yield "\n".join(status), None, None, gr.update(value=[]), gr.update(
                 visible=False
             )
-
+            init_time = time.time()
             c3d_asset = client.assets.upload_file(f)
             status.append(
                 f"\t🔹 C3D file uploaded in {time.time() - init_time:.2f} seconds"
@@ -240,6 +240,5 @@ with gr.Blocks() as app:
 if __name__ == "__main__":
     app.launch(
         share=True,
-        server_name="0.0.0.0",
         server_port=7860,
     )

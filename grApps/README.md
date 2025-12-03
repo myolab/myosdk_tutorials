@@ -66,7 +66,7 @@ source .venv/bin/activate
 .venv\Scripts\activate
 
 # Install dependencies
-uv pip install gradio myosdk
+uv pip install -r requirements.txt
 ```
 
 ### 3. Alternative: Install with pip
@@ -74,7 +74,7 @@ uv pip install gradio myosdk
 If you prefer not to use UV:
 
 ```bash
-pip install gradio myosdk
+pip install -r requirements.txt
 ```
 
 ## Running the App
