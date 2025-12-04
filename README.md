@@ -1,5 +1,7 @@
 [![PyPI](https://img.shields.io/pypi/v/myosdk)](https://pypi.org/project/MyoLab/)
 [![Docs](https://img.shields.io/badge/Docs-Online-blue)](https://docs.myolab.ai)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1IHmXo8NdSz0Jrkt8mfI9caIn8ajc-h5x)
+
 
 # MyoSapiens SDK (MyoSDK) Tutorials
 
