@@ -122,7 +122,7 @@ def run_retargeting(api_key, c3d_files, markerset_file):
             status.append(f"\t✅ Retargeting completed for {os.path.basename(f)}")
             base = os.path.splitext(os.path.basename(f))[0]
             out_path = os.path.join(tempfile.gettempdir(), base + ".npy")
-            client.assets.download(result["output"]["qpos_asset_id"], out_path)
+            client.assets.download(result["output"]["retarget_output_asset_id"], out_path)
             output_files.append(out_path)
 
         if not output_files:
@@ -137,10 +137,10 @@ def run_retargeting(api_key, c3d_files, markerset_file):
         ), gr.update(visible=True)
 
         data = np.load(output_files[0])
-        joints_qpos = data["joints_qpos"].squeeze()
-        joint_names = data["joints_qpos_colnames"]
+        joint_angles = data["joint_angles_degrees"].squeeze()
+        joint_names = data["joint_names"]
 
-        df = pd.DataFrame(joints_qpos, columns=[jn for jn in joint_names])
+        df = pd.DataFrame(joint_angles, columns=[jn for jn in joint_names])
         df.insert(0, "frame", df.index)
 
         angle_list = list(df.columns[1:])
