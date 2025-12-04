@@ -1,4 +1,9 @@
 """
+Copyright (c) 2025 MyoLab, Inc. All Rights Reserved.
+
+This software and associated documentation files (the "Software") are the intellectual property of MyoLab, Inc. Unauthorized copying, modification, distribution, or use of this code, in whole or in part, without express written permission from the copyright owner is strictly prohibited.
+
+
 MyoSDK Retargeting App
 """
 
