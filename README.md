@@ -2,7 +2,7 @@
 
 This repository contains example scripts, apps, and data for learning how to use the  MyoSapiens SDK (MyoSDK) for motion capture retargeting and visualization.
 
-For details on the SDK, please visit [docs.myolab.ai](docs.myolab.ai)
+For details on the SDK, please visit [docs.myolab.ai](https://docs.myolab.ai)
 
 ## Contents
 - **`python/`**: Jupyter tutorials and supporting Python assets.
