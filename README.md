@@ -1,3 +1,6 @@
+[![PyPI](https://img.shields.io/pypi/v/myosdk)](https://pypi.org/project/MyoLab/)
+[![Docs](https://img.shields.io/badge/Docs-Online-blue)](https://docs.myolab.ai)
+
 # MyoSapiens SDK (MyoSDK) Tutorials
 
 This repository contains example scripts, apps, and data for learning how to use the MyoSapiens SDK (MyoSDK) for motion capture retargeting (converting motion data to work with different character models) and visualization.
