@@ -137,10 +137,10 @@ def run_retargeting(api_key, c3d_files, markerset_file):
         ), gr.update(visible=True)
 
         data = np.load(output_files[0])
-        joints_qpos = data["joints_qpos"].squeeze()
-        joint_names = data["joints_qpos_colnames"]
+        joint_angles = data["joint_angles_degrees"].squeeze()
+        joint_names = data["joint_names"]
 
-        df = pd.DataFrame(joints_qpos, columns=[jn for jn in joint_names])
+        df = pd.DataFrame(joint_angles, columns=[jn for jn in joint_names])
         df.insert(0, "frame", df.index)
 
         angle_list = list(df.columns[1:])
