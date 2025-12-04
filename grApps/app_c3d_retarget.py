@@ -131,6 +131,7 @@ def run_retargeting(api_key, c3d_files, markerset_file):
             yield "\n".join(status), None, None, gr.update(value=[]), gr.update(
                 visible=False
             )
+            return
 
         # Load angles from first output file
         status.append("🔹 Loading angle data...")
