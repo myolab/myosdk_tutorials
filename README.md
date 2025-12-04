@@ -1,47 +1,63 @@
 # MyoSapiens SDK (MyoSDK) Tutorials
 
-This repository contains example scripts, apps, and data for learning how to use the  MyoSapiens SDK (MyoSDK) for motion capture retargeting and visualization.
+This repository contains example scripts, apps, and data for learning how to use the MyoSapiens SDK (MyoSDK) for motion capture retargeting (converting motion data to work with different character models) and visualization.
 
 For details on the SDK, please visit [docs.myolab.ai](https://docs.myolab.ai)
 
 ## Contents
-- **`python/`**: Jupyter tutorials and supporting Python assets.
-- **`grApps/`**: Example graphical/CLI applications in [gradio](https://www.gradio.app/) for working with C3D data and retargeting. See [Readme](./grApps/README.md).
-- **`data/`**: Sample C3D motion capture files (e.g., CMU) used by the tutorials and apps.
-- **`markersets/`**: Marker set definition files (e.g., CMU marker configuration). See [Readme](./markersets/Readme.md).
+- **`python/`**: Jupyter notebook tutorials (interactive Python notebooks) and supporting Python assets.
+- **`grApps/`**: Example web applications built with [Gradio](https://www.gradio.app/) (a Python library for creating user interfaces) for working with C3D motion capture files and retargeting. See [Readme](./grApps/README.md).
+- **`data/`**: Sample C3D motion capture files (C3D is a standard format for storing motion capture data, e.g., CMU dataset) used by the tutorials and apps.
+- **`markersets/`**: Marker set definition files (XML files that describe which markers are used in your motion capture data, e.g., CMU marker configuration). See [Readme](./markersets/Readme.md).
 
 ## Getting Started
-### Open the tutorials
-Install Python dependencies using
+
+You can either follow the interactive tutorials or use the web-based application. Choose the option that works best for you.
+
+### Option 1: Interactive Tutorials (Recommended for learning)
+
+1. Install the required Python packages:
 ```bash
 pip install myosdk jupyter ipykernel
 ```
-Run`python/tutorial.ipynb` to step through example workflows.
-### Or, Explore the apps
-Go in `grApps/` for end-to-end C3D retargeting examples via gradio UI.
 
-Install Python dependencies using
+2. Open the tutorial notebook:
+   - If you have Jupyter installed, you can run: `jupyter notebook python/tutorial.ipynb`
+   - Or open `python/tutorial.ipynb` in your preferred notebook environment (Jupyter Lab, VS Code, etc.)
+   - The notebook will guide you through example workflows step by step
+
+### Option 2: Web Application (Quick start)
+
+1. Navigate to the `grApps/` directory and install dependencies:
 ```bash
 pip install -r grApps/requirements.txt
+```
+
+2. Run the application:
+```bash
 python grApps/app_c3d_retarget.py
 ```
+
+3. The app will start a local web server. Open the URL shown in your terminal (usually `http://127.0.0.1:7860`) in your web browser to use the graphical interface.
 ## Example Files
 
-Example files are available in the repository:
-- **C3D file**: `../data/35_30.c3d`
-- **Markerset**: `../markersets/cmu_markerset.xml`
+Example files are included in this repository to help you get started:
+- **C3D file**: `data/35_30.c3d` - A sample motion capture file
+- **Markerset**: `markersets/cmu_markerset.xml` - The corresponding marker configuration file that describes the markers used in the C3D file
 
 ## Troubleshooting
 
 ### API Key Issues
 - Make sure your API key is correct and active
-- Check that you have an active MyoLab account
-- Verify the API key is set correctly (environment variable or entered in the app)
+- Check that you have an active MyoLab account (sign up at [docs.myolab.ai](https://docs.myolab.ai) if needed)
+- Verify the API key is set correctly:
+  - In the web app: Enter it in the API key field
+  - In Python scripts: Set it as an environment variable or pass it directly in your code
 
 ### File Upload Issues
-- Ensure your C3D file is a valid motion capture file
-- Verify your markerset XML file is properly formatted
-- Check that both files are compatible (markerset matches the markers in your C3D file)
+- Ensure your C3D file is a valid motion capture file (not corrupted)
+- Verify your markerset XML file is properly formatted (follow the examples in `markersets/`)
+- Check that both files are compatible: the markerset must describe the same markers that are present in your C3D file
 
 ### Job Failures
 - The retargeting process may fail if the C3D and markerset files are incompatible
@@ -67,8 +83,8 @@ To modify the app, edit `app_c3d_retarget.py`. The app uses:
 
 ## Notes
 
-- The retargeting process typically might several seconds depending on the lenght of the motion file
-- The output file is in NPZ format (NumPy binary) containing the retargeted motion data and joint information
+- The retargeting process typically takes several seconds depending on the length of the motion file
+- The output file is in NPZ format (NumPy binary format, which you can load in Python using `numpy.load()`) containing the retargeted motion data and joint information
 - The app creates temporary files that are cleaned up automatically
 - For production use, consider adding authentication and rate limiting
 
