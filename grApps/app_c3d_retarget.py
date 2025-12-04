@@ -122,7 +122,7 @@ def run_retargeting(api_key, c3d_files, markerset_file):
             status.append(f"\t✅ Retargeting completed for {os.path.basename(f)}")
             base = os.path.splitext(os.path.basename(f))[0]
             out_path = os.path.join(tempfile.gettempdir(), base + ".npy")
-            client.assets.download(result["output"]["qpos_asset_id"], out_path)
+            client.assets.download(result["output"]["retarget_output_asset_id"], out_path)
             output_files.append(out_path)
 
         if not output_files:
