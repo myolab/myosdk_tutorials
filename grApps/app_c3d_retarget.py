@@ -16,6 +16,7 @@ import gradio as gr
 import numpy as np
 import pandas as pd
 import plotly.graph_objs as go
+import spaces
 import torch
 from metrabs_pytorch.scripts.run_video import run_metrabs_video
 from myo_tools.mjs.marker.marker_api import get_marker_names
@@ -30,24 +31,6 @@ PLOT_CONFIG = {
     "yaxis": {"gridcolor": "#1e293b", "linecolor": "#334155"},
 }
 
-custom_css = """
-.upload-box {
-    border: 2px dashed #ccc;
-    border-radius: 8px;
-    padding: 30px;
-    text-align: center;
-    cursor: pointer;
-}
-.upload-box:hover {
-    border-color: #666;
-}
-#file-upload {
-    position: absolute !important;
-    opacity: 0 !important;
-    pointer-events: none !important;
-    height: 0 !important;
-}
-"""
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -64,7 +47,7 @@ def draw_keypoints(frame, poses2d, radius=10):
 
 
 def save_video_with_keypoints(results, output_video):
-    fourcc = cv2.VideoWriter_fourcc(*"avc1")
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     out = cv2.VideoWriter(
         output_video,
         fourcc,
@@ -79,34 +62,6 @@ def save_video_with_keypoints(results, output_video):
         out.write(frame)
     out.release()
     return output_video
-
-
-def update_display(files, str_msg="📁 Click to select XML files"):
-    if files is None:
-        return f'<div class="upload-box" onclick="document.querySelector(\'input[type=file]\').click()">{str_msg}</div>'
-
-    # Handle single file (not a list) or empty list
-    if not isinstance(files, list):
-        files = [files]
-
-    if len(files) == 0:
-        return f'<div class="upload-box" onclick="document.querySelector(\'input[type=file]\').click()">{str_msg}</div>'
-
-    # Handle both file objects (with .name attribute) and strings (file paths)
-    filenames = []
-    for f in files:
-        if isinstance(f, str):
-            # If it's a string, extract filename from path
-            filenames.append(f.split("/")[-1])
-        elif hasattr(f, "name"):
-            # If it's a file object with .name attribute
-            filenames.append(f.name.split("/")[-1])
-        else:
-            # Fallback: convert to string and extract filename
-            filenames.append(str(f).split("/")[-1])
-
-    file_list = "<br>".join([f"✓ {name}" for name in filenames])
-    return f'<div class="upload-box" onclick="document.querySelector(\'input[type=file]\').click()">{file_list}<br><br>Click to reselect</div>'
 
 
 def load_all_videos():
@@ -129,8 +84,9 @@ def run_retargeting_c3d(api_key, c3d_files, markerset_file):
     if not api_key:
         api_key = os.getenv("MYOSDK_API_KEY")
         if not api_key:
+            gr.Warning("❌ Error: API key is missing!", duration=5)
             yield (
-                "❌ Error: API key missing",
+                "❌ Error: API key is missing or invalid",
                 None,
                 None,
                 gr.update(value=[], visible=True),
@@ -269,6 +225,7 @@ def run_retargeting_c3d(api_key, c3d_files, markerset_file):
         )
 
 
+@spaces.GPU
 def run_retargeting_video(
     api_key,
     video_file="",
@@ -280,15 +237,16 @@ def run_retargeting_video(
     if not api_key:
         api_key = os.getenv("MYOSDK_API_KEY")
         if not api_key:  # covers None, "", or other falsy values
+            gr.Warning("❌ Error: API key is missing!", duration=5)
             yield (
                 "❌ Error: API key is missing or invalid",
                 None,
                 None,
                 gr.update(visible=False),
                 gr.update(visible=False),
-                None,
+                video_file,
             )
-            raise ValueError("❌ Error: API key is missing or invalid")
+            return
 
     # Extract path from list if it's a list, otherwise use directly
     if isinstance(video_file, list):
@@ -491,7 +449,7 @@ def update_plot(df, joints):
     return fig
 
 
-with gr.Blocks(css=custom_css) as app:
+with gr.Blocks() as app:
 
     with gr.Row():
         with gr.Column(scale=3):
@@ -532,20 +490,14 @@ with gr.Blocks(css=custom_css) as app:
                     </span>
                     """
                 )
-                upload_markerset_display = gr.HTML(
-                    '<div class="upload-box" onclick="document.querySelector(\'input[type=file]\').click()">📁 Click to select XML file</div>'
-                )
 
                 markerset = gr.File(
-                    label=None,
+                    # label=None,
                     file_types=[".xml"],
-                    elem_id="file-upload",
-                )
-
-                markerset.change(
-                    lambda files: update_display(files, "📁 Click to select XML file"),
-                    [markerset],
-                    upload_markerset_display,
+                    elem_id="file-upload-markerset",
+                    value=os.path.join(
+                        os.path.dirname(__file__), "../markersets/cmu_markerset.xml"
+                    ),
                 )
 
             with gr.Column(scale=2):
@@ -559,22 +511,17 @@ with gr.Blocks(css=custom_css) as app:
                     </span>
                     """
                 )
-                upload_c3d_display = gr.HTML(
-                    '<div class="upload-box" onclick="document.querySelector(\'input[type=file]\').click()">📁 Click to select C3D files</div>'
-                )
 
                 c3d_files = gr.File(
                     label=None,
                     file_types=[".c3d"],
-                    elem_id="file-upload",
+                    elem_id="file-upload-c3d",
                     file_count="multiple",
+                    value=[
+                        os.path.join(os.path.dirname(__file__), "../data/35_30.c3d")
+                    ],
                 )
 
-                c3d_files.change(
-                    lambda files: update_display(files, "📁 Click to select C3D files"),
-                    [c3d_files],
-                    upload_c3d_display,
-                )
         run_btn_c3d = gr.Button("3. 🚀 Run Retargeting", variant="primary")
 
     with gr.Tab("🎥 Video-Based Motion Retargeting"):

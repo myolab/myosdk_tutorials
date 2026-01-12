@@ -3,3 +3,4 @@ plotly
 myosdk
 myo_tools
 git+https://github.com/Vittorio-Caggiano/metrabs.git
+spaces
