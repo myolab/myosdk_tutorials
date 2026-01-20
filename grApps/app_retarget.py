@@ -170,7 +170,6 @@ def run_retargeting_c3d(api_key, c3d_files, markerset_file):
             gr.update(visible=False),
             gr.update(visible=False),
         )
-        return
 
     try:
         # Initialize client
@@ -254,7 +253,6 @@ def run_retargeting_c3d(api_key, c3d_files, markerset_file):
             client.assets.download(
                 result["output"]["retarget_output_asset_ids"]["qpos"], out_path
             )
-            return
 
             output_files.append(out_path)
             client.assets.download(
