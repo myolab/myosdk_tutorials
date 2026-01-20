@@ -1,10 +1,14 @@
 """
-Copyright (c) 2025 MyoLab, Inc. All Rights Reserved.
+Copyright (c) 2026 MyoLab, Inc.
 
-This software and associated documentation files (the "Software") are the intellectual property of MyoLab, Inc. Unauthorized copying, modification, distribution, or use of this code, in whole or in part, without express written permission from the copyright owner is strictly prohibited.
+Released under the MyoLab Non-Commercial Scientific Research License
+on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+either express or implied.
 
+You may not use this file except in compliance with the License.
+See the LICENSE file for governing permissions and limitations.
 
-MyoSDK Retargeting App
+MyoSDK Kinesis App
 """
 
 import os
@@ -14,13 +18,14 @@ import time
 import cv2
 import gradio as gr
 import numpy as np
-import pandas as pd
 import plotly.graph_objs as go
 import spaces
 import torch
 from metrabs_pytorch.scripts.run_video import run_metrabs_video
 from myo_tools.mjs.marker.marker_api import get_marker_names
 from myo_tools.utils.file_ops.dataframe_utils import from_array_to_dataframe
+from myo_tools.utils.file_ops.io_utils import from_qpos_to_joint_angles
+from myo_tools.utils.mocap_ops.mocap_utils import rotate_mocap_ydown_to_zup
 from myosdk import Client
 
 PLOT_CONFIG = {
@@ -73,12 +78,73 @@ def load_all_videos():
     ]
 
 
+def create_info_text(title, info_text):
+    return f"""
+    <div>
+        <style>
+        .info-icon {{
+            position: relative;
+            display: inline-block;
+            cursor: help;
+            color: #6b7280;
+            margin-left: 5px;
+            font-size: 0.9em;
+        }}
+
+        .info-icon .tooltip-text {{
+            visibility: hidden;
+            position: absolute;
+            width: 250px;
+            background-color: #1f2937;
+            color: #fff;
+            text-align: left;
+            border-radius: 6px;
+            padding: 10px;
+            left: 0;
+            top: 25px;
+            z-index: 9999;
+            font-size: 0.9em;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            opacity: 0;
+            transition: opacity 0.2s, visibility 0.2s;
+        }}
+
+        .info-icon:hover .tooltip-text,
+        .tooltip-text:hover {{
+            visibility: visible;
+            opacity: 1;
+        }}
+
+        .tooltip-text a {{
+            color: #60a5fa;
+            text-decoration: none;
+        }}
+
+        .tooltip-text a:hover {{
+            text-decoration: underline;
+        }}
+        </style>
+
+        <div style="margin-bottom: 10px;">
+            <strong>{title}</strong>
+            <span class="info-icon">
+                ℹ️
+                <span class="tooltip-text">
+                    {info_text}
+                </span>
+            </span>
+        </div>
+    </div>
+    """
+
+
 # ------------------------------------------------------------
 # Retargeting
 # ------------------------------------------------------------
 def run_retargeting_c3d(api_key, c3d_files, markerset_file):
     status = []
     output_files = []
+    output_glb_files = []
 
     # Initial validation
     if not api_key:
@@ -91,6 +157,7 @@ def run_retargeting_c3d(api_key, c3d_files, markerset_file):
                 None,
                 gr.update(value=[], visible=True),
                 gr.update(visible=False),
+                gr.update(visible=False),
             )
             return
 
@@ -101,6 +168,7 @@ def run_retargeting_c3d(api_key, c3d_files, markerset_file):
             None,
             gr.update(value=[], visible=True),
             gr.update(visible=False),
+            gr.update(visible=False),
         )
 
     try:
@@ -109,7 +177,7 @@ def run_retargeting_c3d(api_key, c3d_files, markerset_file):
         init_time = time.time()
         yield "\n".join(status), None, None, gr.update(visible=False), gr.update(
             visible=False
-        )
+        ), gr.update(visible=False)
         client = Client(api_key=api_key)
 
         status.append(
@@ -120,7 +188,7 @@ def run_retargeting_c3d(api_key, c3d_files, markerset_file):
         status.append("🔹 Uploading markerset file...")
         yield "\n".join(status), None, None, gr.update(value=[]), gr.update(
             visible=False
-        )
+        ), gr.update(visible=False)
         mk_asset = client.assets.upload_file(markerset_file.name)
 
         status.append(
@@ -128,7 +196,7 @@ def run_retargeting_c3d(api_key, c3d_files, markerset_file):
         )
         yield "\n".join(status), None, None, gr.update(value=[]), gr.update(
             visible=False
-        )
+        ), gr.update(visible=False)
 
         mk_id = mk_asset["asset_id"]
 
@@ -141,65 +209,71 @@ def run_retargeting_c3d(api_key, c3d_files, markerset_file):
 
             yield "\n".join(status), None, None, gr.update(value=[]), gr.update(
                 visible=False
-            )
+            ), gr.update(visible=False)
+
             init_time = time.time()
-            c3d_asset = client.assets.upload_file(f)
+            tracker_asset = client.assets.upload_file(f)
             status.append(
                 f"\t🔹 C3D file uploaded in {time.time() - init_time:.2f} seconds"
             )
             yield "\n".join(status), None, None, gr.update(value=[]), gr.update(
                 visible=False
-            )
+            ), gr.update(visible=False)
             init_time = time.time()
             job = client.jobs.start_retarget(
-                c3d_asset_id=c3d_asset["asset_id"],
+                tracker_asset_id=tracker_asset["asset_id"],
                 markerset_asset_id=mk_id,
+                export_glb=True,
             )
 
             status.append(
-                f"\t🔹 Retargeting job started in {time.time() - init_time:.2f} seconds"
+                f"\t🔹 Retargeting job started in {time.time() - init_time:.2f} seconds ... Processing may take a few seconds depending on the file size."
             )
             yield "\n".join(status), None, None, gr.update(value=[]), gr.update(
                 visible=False
-            )
+            ), gr.update(visible=False)
             init_time = time.time()
             result = client.jobs.wait(job["job_id"])
 
             status.append(
                 f"\t🔹 Retargeting job completed in {time.time() - init_time:.2f} seconds"
-            )
+            ), gr.update(visible=False),
             yield "\n".join(status), None, None, gr.update(value=[]), gr.update(
                 visible=False
-            )
-            if result["status"] != "SUCCEEDED":
-                status.append(f"\t❌ Failed retarget for {os.path.basename(f)}")
-                continue
+            ), gr.update(visible=False)
+            assert (
+                result["status"] == "SUCCEEDED"
+            ), f"Failed retarget for {os.path.basename(f)}"
 
             status.append(f"\t✅ Retargeting completed for {os.path.basename(f)}")
             base = os.path.splitext(os.path.basename(f))[0]
-            out_path = os.path.join(tempfile.gettempdir(), base + ".npy")
-            client.assets.download(
-                result["output"]["retarget_output_asset_id"], out_path
-            )
-            output_files.append(out_path)
+            out_path = os.path.join(tempfile.gettempdir(), base + ".parquet")
+            output_glb_path = os.path.join(tempfile.gettempdir(), base + ".glb")
 
-        if not output_files:
-            yield "\n".join(status), None, None, gr.update(value=[]), gr.update(
-                visible=False
+            client.assets.download(
+                result["output"]["retarget_output_asset_ids"]["qpos"], out_path
             )
+
+            output_files.append(out_path)
+            client.assets.download(
+                result["output"]["retarget_output_asset_ids"]["motion"], output_glb_path
+            )
+            output_glb_files.append(output_glb_path)
+
+        assert os.path.exists(
+            output_files[0]
+        ), f"Failed to download retargeted data for {os.path.basename(f)}"
 
         # Load angles from first output file
-        status.append("🔹 Loading angle data...")
+        status.append("🔹 Loading animation and angle data...")
+
+        assert os.path.getsize(output_glb_files[0]) > 0
+        time.sleep(0.1)  # allow filesystem flush
         yield "\n".join(status), None, None, gr.update(
             interactive=True, visible=True
-        ), gr.update(visible=True)
+        ), gr.update(visible=True), gr.update(visible=True, value=output_glb_files[0])
 
-        data = np.load(output_files[0])
-        joint_angles = data["joint_angles_degrees"].squeeze()
-        joint_names = data["joint_names"]
-
-        df = pd.DataFrame(joint_angles, columns=[jn for jn in joint_names])
-        df.insert(0, "frame", df.index)
+        df = from_qpos_to_joint_angles(output_files[0])
 
         angle_list = list(df.columns[1:])
         initial_value = [angle_list[0]] if angle_list else []
@@ -211,6 +285,7 @@ def run_retargeting_c3d(api_key, c3d_files, markerset_file):
             df,
             gr.update(choices=angle_list, value=initial_value, visible=True),
             gr.update(visible=True),
+            gr.update(visible=True, value=output_glb_files[0]),
         )
 
     except Exception as e:
@@ -218,6 +293,7 @@ def run_retargeting_c3d(api_key, c3d_files, markerset_file):
             f"❌ {e}",
             None,
             None,
+            gr.update(visible=False),
             gr.update(visible=False),
             gr.update(visible=False),
         )
@@ -243,6 +319,7 @@ def run_retargeting_video(
                 gr.update(visible=False),
                 gr.update(visible=False),
                 video_file,
+                gr.update(visible=False),
             )
             return
 
@@ -264,6 +341,7 @@ def run_retargeting_video(
             gr.update(visible=False),
             gr.update(visible=False),
             video_file,
+            gr.update(visible=False),
         )
         return
 
@@ -276,13 +354,15 @@ def run_retargeting_video(
         init_time = time.time()
         yield "\n".join(status), None, None, gr.update(visible=False), gr.update(
             visible=False
-        ), video_path
+        ), video_path, gr.update(visible=False)
 
         results = list(
             run_metrabs_video(video_path=video_path, device=DEVICE, visualize=False)
         )
+        markers = rotate_mocap_ydown_to_zup(
+            np.array([res["poses3d"] for res in results]).squeeze()
+        )
 
-        markers = np.array([res["poses3d"] for res in results]).squeeze()
         fps = (
             results[0]["fps"] if results else 25.0
         )  # Default to 25 fps if not available
@@ -294,20 +374,20 @@ def run_retargeting_video(
 
         yield "\n".join(status), None, None, gr.update(visible=False), gr.update(
             visible=True
-        ), video_with_keypoints,
+        ), video_with_keypoints, gr.update(visible=False)
         status.append(
             f"🔹 Pose Extraction from Video Completed in {time.time() - init_time:.2f} seconds with {len(markers)} frames extracted ({((time.time() - init_time)/len(markers)):.2f} seconds per frame)"
         )
         print("🔹 Pose Extraction from Video Completed")
         yield "\n".join(status), None, None, gr.update(visible=False), gr.update(
             visible=False
-        ), video_with_keypoints
+        ), video_with_keypoints, gr.update(visible=False)
         # Initialize client
         status.append("🔹 Initializing MyoSDK client...")
         init_time = time.time()
         yield "\n".join(status), None, None, gr.update(visible=False), gr.update(
             visible=False,
-        ), video_with_keypoints
+        ), video_with_keypoints, gr.update(visible=False)
         client = Client(api_key=api_key)
 
         status.append(
@@ -318,7 +398,7 @@ def run_retargeting_video(
         status.append("🔹 Uploading markerset file...")
         yield "\n".join(status), None, None, gr.update(value=[]), gr.update(
             visible=False,
-        ), video_with_keypoints
+        ), video_with_keypoints, gr.update(visible=False)
 
         markerset_file_name = "markersets/movi_metrabs_markerset.xml"
 
@@ -330,28 +410,37 @@ def run_retargeting_video(
 
         yield "\n".join(status), None, None, gr.update(value=[]), gr.update(
             visible=False
-        ), video_with_keypoints
+        ), video_with_keypoints, gr.update(visible=False)
         init_time = time.time()
 
         marker_names = get_marker_names(markerset_file_name)
+
+        from_array_to_dataframe(
+            np.array([res["poses3d"] for res in results]).squeeze(),
+            marker_names,
+            fps,
+            "./video_trackers_original.parquet",
+        )
+
         fn_parquet = os.path.join(tempfile.gettempdir(), "video_trackers.parquet")
         from_array_to_dataframe(markers, marker_names, fps, fn_parquet)
-        markers_asset = client.assets.upload_file(fn_parquet, purpose="retarget")
+        tracker_asset = client.assets.upload_file(fn_parquet)
 
         print("fn_parquet: ", fn_parquet)
 
         init_time = time.time()
         job = client.jobs.start_retarget(
-            c3d_asset_id=markers_asset["asset_id"],
+            tracker_asset_id=tracker_asset["asset_id"],
             markerset_asset_id=mk_asset["asset_id"],
+            export_glb=True,
         )
 
         status.append(
-            f"\t🔹 Retargeting job started in {time.time() - init_time:.2f} seconds"
+            f"\t🔹 Retargeting job started in {time.time() - init_time:.2f} seconds ... Processing may take a few seconds depending on the video length."
         )
         yield "\n".join(status), None, None, gr.update(value=[]), gr.update(
             visible=False
-        ), video_with_keypoints
+        ), video_with_keypoints, gr.update(visible=False)
         init_time = time.time()
         result = client.jobs.wait(job["job_id"])
 
@@ -360,32 +449,37 @@ def run_retargeting_video(
         )
         yield "\n".join(status), None, None, gr.update(value=[]), gr.update(
             visible=False
-        ), video_with_keypoints
+        ), video_with_keypoints, gr.update(visible=False)
+
         print("STATUS: ", result["status"])
         assert (
             result["status"] == "SUCCEEDED"
         ), f"Failed retarget for {os.path.basename(video_path)}"
 
         base = os.path.splitext(os.path.basename(video_path))[0]
-        out_path = os.path.join(tempfile.gettempdir(), base + ".npy")
-        client.assets.download(result["output"]["retarget_output_asset_id"], out_path)
+        out_path = os.path.join(tempfile.gettempdir(), base + ".parquet")
+        output_glb_path = os.path.join(tempfile.gettempdir(), base + ".glb")
+        client.assets.download(
+            result["output"]["retarget_output_asset_ids"]["qpos"], out_path
+        )
 
         assert os.path.exists(
             out_path
         ), f"Failed to download retargeted data for {os.path.basename(video_path)}"
 
+        client.assets.download(
+            result["output"]["retarget_output_asset_ids"]["motion"], output_glb_path
+        )
+
         # Load angles from first output file
-        status.append("🔹 Loading angle data...")
+        status.append("🔹 Loading animation and angle data...")
         yield "\n".join(status), None, None, gr.update(
             interactive=True, visible=True
-        ), gr.update(visible=True), video_with_keypoints
+        ), gr.update(visible=True), video_with_keypoints, gr.update(
+            visible=True, value=output_glb_path
+        )
 
-        data = np.load(out_path)
-        joint_angles = data["joint_angles_degrees"].squeeze()
-        joint_names = data["joint_names"]
-
-        df = pd.DataFrame(joint_angles, columns=[jn for jn in joint_names])
-        df.insert(0, "frame", df.index)
+        df = from_qpos_to_joint_angles(out_path)
 
         angle_list = list(df.columns[1:])
         initial_value = [angle_list[0]] if angle_list else []
@@ -398,6 +492,7 @@ def run_retargeting_video(
             gr.update(choices=angle_list, value=initial_value, visible=True),
             gr.update(visible=True),
             video_with_keypoints,
+            gr.update(visible=True, value=output_glb_path),
         )
 
     except Exception as e:
@@ -431,12 +526,12 @@ def update_plot(df, joints):
     fig = go.Figure()
     for j in joints:
         if j in df.columns:
-            fig.add_trace(go.Scatter(x=df["frame"], y=df[j], mode="lines", name=j))
+            fig.add_trace(go.Scatter(x=df["time"], y=df[j], mode="lines", name=j))
 
     fig.update_layout(
         title="Joint Angles",
-        xaxis_title="Frame",
-        yaxis_title="Angle Value",
+        xaxis_title="Time (s)",
+        yaxis_title="Angle Value (degrees)",
         plot_bgcolor="#1E1E1E",
         paper_bgcolor="#1E1E1E",
         font=dict(color="#F0F0F0", family="Arial"),
@@ -453,7 +548,7 @@ with gr.Blocks() as app:
         with gr.Column(scale=3):
             gr.Markdown(
                 """
-                ## MyoSDK Retargeting
+                ## MyoSDK Kinesis
                 <span style="color:#6b7280">Joint visualization & motion retargeting pipelines</span>
 
                 This application allows you to retarget motion capture data to biomechanical models using MyoSDK's Kinesis engine.
@@ -477,16 +572,12 @@ with gr.Blocks() as app:
         )
         with gr.Row(equal_height=True):
             with gr.Column(scale=2):
-                gr.Markdown(
-                    """
-                    **1. Upload a Markerset File**
-                    <br>
-                    <span style="color:#6b7280; font-size: 0.9em">
-                    Upload an XML file that defines the marker set configuration.
-                    This file specifies which markers are used and their anatomical locations.
-                    See [Markerset Editor](https://markerset-editor.myolab.ai) for more details.
-                    </span>
-                    """
+                gr.HTML(
+                    create_info_text(
+                        "1. Upload a Markerset File",
+                        "Upload an XML file that defines the marker set configuration. This file specifies which markers are used and their anatomical locations."
+                        + 'See <a href="https://markerset-editor.myolab.ai">Markerset Editor</a> for more details.',
+                    )
                 )
 
                 markerset = gr.File(
@@ -499,17 +590,13 @@ with gr.Blocks() as app:
                 )
 
             with gr.Column(scale=2):
-                gr.Markdown(
-                    """
-                    **2. Upload C3D Motion Capture File(s)**
-                    <br>
-                    <span style="color:#6b7280; font-size: 0.9em">
-                    Upload one or more C3D files containing 3D marker trajectories from motion capture systems.
-                    Multiple files can be processed in batch. Each file will be retargeted using the same markerset.
-                    </span>
-                    """
+                gr.HTML(
+                    create_info_text(
+                        "2. Upload C3D Motion Capture File(s)",
+                        "Upload one or more C3D files containing 3D marker trajectories from motion capture systems."
+                        + 'Example from CMU dataset: <a href="https://mocap.cs.cmu.edu/subjects/35/35_30.c3d">35_30.c3d</a>',
+                    )
                 )
-
                 c3d_files = gr.File(
                     label=None,
                     file_types=[".c3d"],
@@ -529,7 +616,7 @@ with gr.Blocks() as app:
 
             ⚠️ **Important:** Using Metrabs for video-based motion retargeting which is **ONLY FOR RESEARCH/ACADEMIC USE**.
             Please cite the [paper](https://arxiv.org/abs/2409.06042) if you use this feature.
-            For commercial applications, please contact MyoLab.
+            For commercial applications, please contact MyoLab at contacts@myolab.ai.
             """
         )
         video_file = gr.Video(
@@ -543,8 +630,12 @@ with gr.Blocks() as app:
             "2. 🚀 Run Retargeting from Video", variant="primary"
         )
 
+    output_3d_motion = gr.Model3D(
+        label="3D Motion Visualization",
+        visible=False,
+    )
     output_file = gr.File(
-        label="📥 Download Results - Download the retargeted motion data as a NumPy (.npy) file containing joint angles and metadata.",
+        label="📥 Download Results - Download the retargeted motion data as a Parquet (.parquet) file containing joint angles and metadata.",
         visible=False,
     )
     df_state = gr.State()
@@ -573,7 +664,14 @@ with gr.Blocks() as app:
     run_btn_c3d.click(
         fn=run_retargeting_c3d,
         inputs=[api_key, c3d_files, markerset],
-        outputs=[status_box, output_file, df_state, joint_dropdown, plot_area],
+        outputs=[
+            status_box,
+            output_file,
+            df_state,
+            joint_dropdown,
+            plot_area,
+            output_3d_motion,
+        ],
     )
     run_v2m_btn_video.click(
         fn=run_retargeting_video,
@@ -585,6 +683,7 @@ with gr.Blocks() as app:
             joint_dropdown,
             plot_area,
             video_file,
+            output_3d_motion,
         ],
     )
 

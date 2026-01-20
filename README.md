@@ -1,4 +1,4 @@
-[![PyPI](https://img.shields.io/pypi/v/myosdk)](https://pypi.org/project/MyoLab/)
+[![PyPI](https://img.shields.io/pypi/v/myosdk)](https://pypi.org/project/myosdk)
 [![Docs](https://img.shields.io/badge/Docs-Online-blue)](https://docs.myolab.ai)
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1IHmXo8NdSz0Jrkt8mfI9caIn8ajc-h5x)
 
@@ -23,7 +23,7 @@ You can either follow the interactive tutorials or use the web-based application
 
 1. Install the required Python packages:
 ```bash
-pip install myosdk jupyter ipykernel
+pip install myosdk jupyter ipykernel git+https://github.com/Vittorio-Caggiano/metrabs.git
 ```
 
 2. Open the tutorial notebook:
@@ -40,7 +40,7 @@ pip install -r grApps/requirements.txt
 
 2. Run the application:
 ```bash
-python grApps/app_c3d_retarget.py
+python grApps/app_retarget.py
 ```
 
 3. The app will start a local web server. Open the URL shown in your terminal (usually `http://127.0.0.1:7860`) in your web browser to use the graphical interface.
@@ -76,7 +76,7 @@ Example files are included in this repository to help you get started:
 
 ## Development
 
-To modify the app, edit `app_c3d_retarget.py`. The app uses:
+To modify the app, edit `app_retarget.py`. The app uses:
 - **Gradio** for the web interface
 - **MyoSDK** for the retargeting API
 
