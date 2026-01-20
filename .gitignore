@@ -1,3 +1,6 @@
 python/tmp-assets/
 .DS_Store
 grApps/.gradio
+/logs
+.gradio
+*.pyc
