@@ -1,6 +1,7 @@
 [![PyPI](https://img.shields.io/pypi/v/myosdk)](https://pypi.org/project/myosdk)
 [![Docs](https://img.shields.io/badge/Docs-Online-blue)](https://docs.myolab.ai)
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1IHmXo8NdSz0Jrkt8mfI9caIn8ajc-h5x)
+[![Open in Spaces](https://huggingface.co/datasets/huggingface/badges/resolve/main/open-in-hf-spaces-sm.svg)](https://huggingface.co/spaces/caggianov/myosdk_app)
 
 
 # MyoSapiens SDK (MyoSDK) Tutorials
@@ -83,13 +84,10 @@ To modify the app, edit `app_retarget.py`. The app uses:
 ## Additional Resources
 
 - [MyoSDK Documentation](https://docs.myolab.ai/docs/myosdk/getting-started/api-key)
-- [Gradio Documentation](https://www.gradio.app/docs/)
+- [Online Demo](https://huggingface.co/spaces/caggianov/myosdk_app)
 - [UV Documentation](https://github.com/astral-sh/uv)
 
 ## Notes
+- The retargeting process can take several seconds depending on the length of the motion file
 
-- The retargeting process typically takes several seconds depending on the length of the motion file
-- The output file is in NPZ format (NumPy binary format, which you can load in Python using `numpy.load()`) containing the retargeted motion data and joint information
-- The app creates temporary files that are cleaned up automatically
-- For production use, consider adding authentication and rate limiting
 
