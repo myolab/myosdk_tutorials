@@ -83,7 +83,7 @@ To modify the app, edit `app_retarget.py`. The app uses:
 
 ## Additional Resources
 
-- [MyoSDK Documentation](https://docs.myolab.ai/docs/myosdk/getting-started/api-key)
+- [MyoSDK Documentation](https://docs.myolab.ai/)
 - [Online Demo](https://huggingface.co/spaces/caggianov/myosdk_app)
 - [UV Documentation](https://github.com/astral-sh/uv)
 
