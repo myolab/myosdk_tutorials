@@ -85,7 +85,6 @@ To modify the app, edit `app_retarget.py`. The app uses:
 
 - [MyoSDK Documentation](https://docs.myolab.ai/)
 - [Online Demo](https://huggingface.co/spaces/caggianov/myosdk_app)
-- [UV Documentation](https://github.com/astral-sh/uv)
 
 ## Notes
 - The retargeting process can take several seconds depending on the length of the motion file
